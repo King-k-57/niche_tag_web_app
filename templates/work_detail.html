@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}{{ work.title }} | ニッチタグ作品DB{% endblock %}
+{% block meta_description %}
+{{ work.title }}の作品詳細ページです。{% if work.synopsis %}{{ work.synopsis[:120] }}{% else %}タグ情報とあらすじを確認できます。{% endif %}
+{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block content %}
+<section class="card-surface mb-4" data-aos="fade-up">
+  <p class="brand-line mb-2">Work Detail</p>
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+    <div>
+      <p class="work-category mb-2">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+      <h2 class="section-title" style="font-size:1.65rem;">{{ work.title }}</h2>
+      <p class="section-caption mt-2 mb-0">このページでタグを追加すると、検索体験がすぐに改善されます。</p>
+    </div>
+
+    <div class="inline-actions">
+      <a href="{{ url_for('index', category=work.category, filter_applied=1) }}" class="btn btn-minimal">カテゴリ一覧へ戻る</a>
+      {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('toggle_bookmark', work_id=work.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="{{ is_bookmarked and 'remove' or 'add' }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button type="submit" class="btn {{ is_bookmarked and 'btn-minimal-soft' or 'btn-minimal-solid' }}">
+            {{ is_bookmarked and 'マイリストから削除' or 'マイリストに追加' }}
+          </button>
+        </form>
+      {% endif %}
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <form method="post" action="{{ url_for('delete_work', work_id=work.id, category=work.category) }}" onsubmit="return confirm('この作品を削除しますか？');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-minimal-danger">作品を削除</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="card-surface mb-4" data-aos="fade-up" data-aos-delay="35">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">あらすじ</h3>
+    <p class="section-caption">作品の概要を記録しておくと、検索導線がより分かりやすくなります。</p>
+  </div>
+
+  {% if work.synopsis %}
+    <p class="synopsis-text mb-3">{{ work.synopsis|e|replace('\n', '<br>')|safe }}</p>
+  {% else %}
+    <p class="search-empty mb-3">あらすじはまだ登録されていません。</p>
+  {% endif %}
+
+  {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('update_work_synopsis', work_id=work.id) }}" class="row g-3 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-12">
+        <label for="synopsis" class="form-label">あらすじを編集</label>
+        <textarea
+          id="synopsis"
+          name="synopsis"
+          class="form-control"
+          rows="5"
+          placeholder="この作品の魅力や関係性を簡潔にまとめましょう。"
+        >{{ work.synopsis or '' }}</textarea>
+      </div>
+      <div class="col-12 col-lg-3 d-grid">
+        <button type="submit" class="btn btn-minimal-solid">あらすじを保存</button>
+      </div>
+    </form>
+  {% else %}
+    <p class="search-empty mb-0">
+      あらすじの編集にはログインが必要です。
+      <a href="{{ url_for('login', next=request.full_path) }}">ログインして編集する</a>
+    </p>
+  {% endif %}
+</section>
+
+<section class="card-surface mb-4" data-aos="fade-up" data-aos-delay="50">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">この作品のタグ</h3>
+    <p class="section-caption">タグを押すと同じタグの作品一覧へ移動します。</p>
+  </div>
+
+  {% if work.tags %}
+    <div class="section-grid">
+      {% for tag in work.tags %}
+        <article class="work-card d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2" data-aos="fade-up" data-aos-delay="{{ (loop.index0 % 8) * 25 }}">
+          <a class="tag-pill" href="{{ url_for('tag_works', tag_id=tag.id, category=work.category) }}">{{ tag.name }}</a>
+
+          <div class="inline-actions">
+            <a href="{{ url_for('tag_works', tag_id=tag.id, category=work.category) }}" class="btn btn-sm btn-minimal">タグの作品一覧</a>
+            {% if current_user.is_authenticated and current_user.is_admin %}
+              <form method="post" action="{{ url_for('remove_tag_from_work', work_id=work.id, tag_id=tag.id) }}" onsubmit="return confirm('このタグの紐づけを解除しますか？');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-minimal-danger">紐づけ解除</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="search-empty mb-0">まだタグがありません。下のフォームから最初のタグを追加できます。</p>
+  {% endif %}
+</section>
+
+<section class="card-surface" data-aos="fade-up" data-aos-delay="80">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">タグを追加する</h3>
+    <p class="section-caption">作品名検索から来たユーザーでも、ここで直感的にタグ付けできます。</p>
+  </div>
+
+  {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('add_tag_to_work', work_id=work.id) }}" class="row g-3 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-12 col-lg-9">
+        <label for="tag_name" class="form-label">追加したいタグ</label>
+        <input
+          id="tag_name"
+          name="tag_name"
+          type="text"
+          class="form-control form-control-lg"
+          placeholder="例: 両片想い, 記憶喪失再会, クール受け"
+          autocomplete="off"
+          list="tagSuggestList"
+          data-tag-suggest="true"
+          required
+        >
+      </div>
+      <div class="col-12 col-lg-3 d-grid">
+        <button type="submit" class="btn btn-minimal-solid btn-lg">タグを追加</button>
+      </div>
+    </form>
+  {% else %}
+    <p class="search-empty mb-0">
+      タグ追加にはログインが必要です。
+      <a href="{{ url_for('login', next=request.full_path) }}">ログインしてタグを追加する</a>
+    </p>
+  {% endif %}
+
+  <datalist id="tagSuggestList"></datalist>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const datalist = document.getElementById("tagSuggestList");
+    const input = document.querySelector('[data-tag-suggest="true"]');
+    if (!datalist || !input) {
+      return;
+    }
+
+    const currentCategory = "{{ work.category }}";
+    let debounceTimer = null;
+    let activeController = null;
+
+    function clearSuggestions() {
+      datalist.innerHTML = "";
+    }
+
+    async function fetchSuggestions(keyword) {
+      if (!keyword) {
+        clearSuggestions();
+        return;
+      }
+
+      if (activeController) {
+        activeController.abort();
+      }
+      activeController = new AbortController();
+
+      const endpoint =
+        "/api/tags/suggest?q=" +
+        encodeURIComponent(keyword) +
+        "&category=" +
+        encodeURIComponent(currentCategory);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          credentials: "same-origin",
+          signal: activeController.signal
+        });
+
+        if (!response.ok) {
+          clearSuggestions();
+          return;
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const uniqueNames = Array.from(new Set(items.map((item) => item.name))).slice(0, 12);
+
+        clearSuggestions();
+        uniqueNames.forEach((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          datalist.appendChild(option);
+        });
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        clearSuggestions();
+      }
+    }
+
+    input.addEventListener("input", () => {
+      const keyword = (input.value || "").trim();
+      if (debounceTimer) {
+        window.clearTimeout(debounceTimer);
+      }
+      debounceTimer = window.setTimeout(() => {
+        fetchSuggestions(keyword);
+      }, 140);
+    });
+
+    input.addEventListener("blur", () => {
+      window.setTimeout(clearSuggestions, 120);
+    });
+  })();
+</script>
+{% endblock %}

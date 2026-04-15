@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}「{{ query }}」の検索結果 | ニッチタグ作品DB{% endblock %}
+{% block meta_description %}
+「{{ query }}」で検索した{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}作品の一覧ページです。
+{% endblock %}
+
+{% block content %}
+<section class="card-surface mb-4" data-aos="fade-up">
+  <p class="brand-line mb-2">Title Search</p>
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
+    <div>
+      <h2 class="section-title" style="font-size:1.35rem;">「{{ query }}」の検索結果</h2>
+      <p class="section-caption mt-1 mb-0">{{ pagination.total if pagination else works|length }}件ヒットしました。</p>
+    </div>
+
+    <div class="inline-actions">
+      <a href="{{ url_for('index', category=current_category, filter_applied=1) }}" class="btn btn-minimal">カテゴリ一覧へ戻る</a>
+    </div>
+  </div>
+
+  <div class="category-switch">
+    {% for option in category_options %}
+      <a
+        class="category-pill{% if current_category == option.value %} is-active{% endif %}"
+        href="{{ url_for('search_works_by_title', q=query, category=option.value) }}"
+      >
+        {{ option.label }}
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card-surface" data-aos="fade-up" data-aos-delay="40">
+  {% if works %}
+    <!-- 検索後に次の行動を取りやすいよう、詳細導線とタグ導線を同じカードにまとめる -->
+    <div class="work-grid">
+      {% for work in works %}
+        <article class="work-card" data-aos="fade-up" data-aos-delay="{{ (loop.index0 % 12) * 20 }}">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <p class="work-category mb-2">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+              <h3 class="work-title">{{ work.title }}</h3>
+              <p class="work-meta">登録ID: {{ work.id }}</p>
+              {% if work.synopsis %}
+                <p class="work-summary mb-0 mt-2">{{ work.synopsis[:140] }}{% if work.synopsis|length > 140 %}…{% endif %}</p>
+              {% endif %}
+            </div>
+            <a class="btn btn-sm btn-minimal" href="{{ url_for('work_detail', work_id=work.id) }}">作品詳細</a>
+          </div>
+
+          <div class="work-tag-row">
+            {% for tag in work.tags %}
+              <a class="tag-chip small" href="{{ url_for('tag_works', tag_id=tag.id, category=current_category) }}">{{ tag.name }}</a>
+            {% else %}
+              <span class="note-text">タグ未設定</span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    {% if pagination and pagination.pages > 1 %}
+      <nav class="pagination-wrap mt-4" aria-label="作品名検索結果のページ送り">
+        <ul class="pagination pagination-minimal mb-0">
+          <li class="page-item{% if not pagination.has_prev %} disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('search_works_by_title', q=query, category=current_category, page=pagination.prev_num) if pagination.has_prev else '#' }}">前へ</a>
+          </li>
+
+          {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+              <li class="page-item{% if page_num == pagination.page %} active{% endif %}">
+                <a class="page-link" href="{{ url_for('search_works_by_title', q=query, category=current_category, page=page_num) }}">{{ page_num }}</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link is-ellipsis">…</span></li>
+            {% endif %}
+          {% endfor %}
+
+          <li class="page-item{% if not pagination.has_next %} disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('search_works_by_title', q=query, category=current_category, page=pagination.next_num) if pagination.has_next else '#' }}">次へ</a>
+          </li>
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="empty-state-panel" data-aos="zoom-in" data-aos-delay="30">
+      <h4 class="empty-state-title">まだ「{{ query }}」に一致する{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}作品がありません</h4>
+      <p class="empty-state-description">
+        表記ゆれや別キーワードでも探せます。見つからない場合は、あなたが最初の1件を登録してみませんか？
+      </p>
+      <div class="empty-state-actions">
+        <a href="{{ url_for('index', category=current_category, filter_applied=1) }}#create-work" class="btn btn-minimal-solid">＋新しい作品を登録</a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

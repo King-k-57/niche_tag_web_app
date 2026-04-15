@@ -1,0 +1,54 @@
+{% extends "auth_base.html" %}
+
+{% block title %}ログイン | ニッチタグ作品DB{% endblock %}
+
+{% block content %}
+<section class="auth-shell" data-aos="fade-up" data-aos-delay="50">
+  <article class="card-surface auth-card auth-focus-card">
+    <p class="brand-line mb-2">Account Login</p>
+    <h2 class="section-title mb-2" style="font-size:1.35rem;">ログイン</h2>
+    <p class="section-caption mb-4">タグ追加や編集機能は、ログイン中のみ利用できます。</p>
+
+    <!-- 認証失敗時にも入力し直しやすいよう、ユーザー名は再表示する -->
+    <form method="post" action="{{ url_for('login', next=next_url) }}" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="username" class="form-label">ユーザー名</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          class="form-control"
+          value="{{ form_username }}"
+          placeholder="例: anime_tag_fan"
+          autocomplete="username"
+          required
+        >
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">パスワード</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          class="form-control"
+          placeholder="8文字以上"
+          autocomplete="current-password"
+          required
+        >
+      </div>
+
+      <label class="remember-check mb-4" for="remember_me">
+        <input id="remember_me" name="remember_me" type="checkbox" class="form-check-input m-0">
+        <span>ログイン状態を保持する</span>
+      </label>
+
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-minimal-solid">ログインする</button>
+        <a href="{{ url_for('register') }}" class="btn btn-auth-login">新規登録へ</a>
+      </div>
+    </form>
+  </article>
+</section>
+{% endblock %}

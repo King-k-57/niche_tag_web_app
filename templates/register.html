@@ -1,0 +1,61 @@
+{% extends "auth_base.html" %}
+
+{% block title %}新規登録 | ニッチタグ作品DB{% endblock %}
+
+{% block content %}
+<section class="auth-shell" data-aos="fade-up" data-aos-delay="50">
+  <article class="card-surface auth-card auth-focus-card">
+    <p class="brand-line mb-2">Create Account</p>
+    <h2 class="section-title mb-2" style="font-size:1.35rem;">新規登録</h2>
+    <p class="section-caption mb-4">公開プラットフォーム参加用のアカウントを作成します。</p>
+
+    <form method="post" action="{{ url_for('register') }}" class="auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="username" class="form-label">ユーザー名</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          class="form-control"
+          value="{{ form_username }}"
+          placeholder="3文字以上"
+          autocomplete="username"
+          required
+        >
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">パスワード</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          class="form-control"
+          placeholder="8文字以上"
+          autocomplete="new-password"
+          required
+        >
+      </div>
+
+      <div class="mb-4">
+        <label for="password_confirm" class="form-label">パスワード（確認）</label>
+        <input
+          id="password_confirm"
+          name="password_confirm"
+          type="password"
+          class="form-control"
+          placeholder="もう一度入力"
+          autocomplete="new-password"
+          required
+        >
+      </div>
+
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-minimal-solid">登録して始める</button>
+        <a href="{{ url_for('login') }}" class="btn btn-auth-login">ログインへ</a>
+      </div>
+    </form>
+  </article>
+</section>
+{% endblock %}

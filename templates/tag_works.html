@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}タグ: {{ tag.name }} | ニッチタグ作品DB{% endblock %}
+{% block meta_description %}
+タグ「{{ tag.name }}」が付いた{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}作品を{{ works|length }}件表示しています。
+{% endblock %}
+
+{% block content %}
+<section class="card-surface mb-4" data-aos="fade-up">
+  <p class="brand-line mb-2">Tag Results</p>
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+    <div>
+      <h2 class="section-title" style="font-size:1.4rem;">{{ tag.name }}</h2>
+      <p class="section-caption mt-1 mb-0">{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}カテゴリで {{ works|length }}件ヒットしました。</p>
+    </div>
+
+    <div class="inline-actions">
+      <a href="{{ url_for('index', category=current_category, filter_applied=1) }}" class="btn btn-minimal">トップへ戻る</a>
+      <a href="{{ url_for('index', category=current_category, tag_ids=tag.id, filter_applied=1) }}" class="btn btn-minimal-soft">このタグで再検索</a>
+    </div>
+  </div>
+
+  <div class="category-switch mt-3">
+    {% for option in category_options %}
+      <a
+        class="category-pill{% if current_category == option.value %} is-active{% endif %}"
+        href="{{ url_for('tag_works', tag_id=tag.id, category=option.value) }}"
+      >
+        {{ option.label }}
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card-surface" data-aos="fade-up" data-aos-delay="50">
+  <div class="search-result-head">
+    <h3 class="section-title">紐づいている作品</h3>
+    <p class="section-caption">{{ works|length }}件</p>
+  </div>
+
+  {% if works %}
+    <div class="section-grid">
+      {% for work in works %}
+        <article class="work-card" data-aos="fade-up" data-aos-delay="{{ (loop.index0 % 8) * 35 }}">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <p class="work-category mb-2">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+              <h3 class="work-title">{{ work.title }}</h3>
+              <p class="work-meta">作品詳細からタグの追加・解除ができます</p>
+              {% if work.synopsis %}
+                <p class="work-summary mb-0 mt-2">{{ work.synopsis[:140] }}{% if work.synopsis|length > 140 %}…{% endif %}</p>
+              {% endif %}
+            </div>
+            <a class="btn btn-sm btn-minimal" href="{{ url_for('work_detail', work_id=work.id) }}">作品詳細</a>
+          </div>
+
+          <div class="work-tag-row">
+            {% for each_tag in work.tags %}
+              <a class="tag-pill" href="{{ url_for('tag_works', tag_id=each_tag.id, category=current_category) }}">{{ each_tag.name }}</a>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state-panel" data-aos="zoom-in" data-aos-delay="30">
+      <h4 class="empty-state-title">このタグがついた{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}作品はまだありません</h4>
+      <p class="empty-state-description">
+        最初の1件を登録すると、このタグを起点に作品探索がしやすくなります。
+      </p>
+      <div class="empty-state-actions">
+        <a href="{{ url_for('index', category=current_category, filter_applied=1) }}#create-work" class="btn btn-minimal-solid">＋新しい作品を登録</a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

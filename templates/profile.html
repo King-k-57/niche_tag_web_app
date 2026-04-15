@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ current_user.username }}のマイページ | ニッチタグ作品DB{% endblock %}
+{% block meta_description %}
+{{ current_user.username }}さんのプロフィールと、マイリストに保存した作品一覧ページです。
+{% endblock %}
+
+{% block content %}
+<section class="card-surface mb-4" data-aos="fade-up">
+  <p class="brand-line mb-2">Account Profile</p>
+  <div class="search-result-head mb-3">
+    <div>
+      <h2 class="section-title profile-title">{{ current_user.username }} のアカウント詳細</h2>
+      <p class="section-caption mt-1 mb-0">プロフィール情報とマイリストを一か所で確認できます。</p>
+    </div>
+    <div class="inline-actions">
+      <a href="{{ url_for('index', category=current_category, filter_applied=1) }}" class="btn btn-minimal">トップへ戻る</a>
+    </div>
+  </div>
+
+  <div class="profile-meta-grid">
+    <article class="profile-meta-item">
+      <p class="profile-label">ユーザー名</p>
+      <p class="profile-value">{{ current_user.username }}</p>
+    </article>
+    <article class="profile-meta-item">
+      <p class="profile-label">登録日</p>
+      <p class="profile-value">{{ current_user.created_at.strftime('%Y-%m-%d %H:%M') if current_user.created_at else '不明' }}</p>
+    </article>
+    <article class="profile-meta-item">
+      <p class="profile-label">権限</p>
+      <p class="profile-value">{{ current_user.is_admin and '管理者' or '一般ユーザー' }}</p>
+    </article>
+  </div>
+</section>
+
+<section class="card-surface" data-aos="fade-up" data-aos-delay="40">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">マイリスト</h3>
+    <p class="section-caption">{{ bookmarked_works|length }}件の作品を保存しています。</p>
+  </div>
+
+  {% if bookmarked_works %}
+    <div class="work-grid profile-bookmark-grid">
+      {% for work in bookmarked_works %}
+        <article class="work-card profile-work-card" data-aos="fade-up" data-aos-delay="{{ (loop.index0 % 8) * 25 }}">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <p class="work-category mb-2">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+              <h3 class="work-title">{{ work.title }}</h3>
+              {% if work.synopsis %}
+                <p class="work-summary mb-0 mt-2">{{ work.synopsis[:140] }}{% if work.synopsis|length > 140 %}…{% endif %}</p>
+              {% else %}
+                <p class="work-meta mb-0 mt-2">あらすじ未設定</p>
+              {% endif %}
+            </div>
+
+            <div class="inline-actions">
+              <a class="btn btn-sm btn-minimal" href="{{ url_for('work_detail', work_id=work.id) }}">作品詳細</a>
+              <form method="post" action="{{ url_for('toggle_bookmark', work_id=work.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="remove">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit" class="btn btn-sm btn-minimal-soft">解除</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="work-tag-row">
+            {% for tag in work.tags %}
+              <a class="tag-chip small" href="{{ url_for('tag_works', tag_id=tag.id, category=work.category) }}">{{ tag.name }}</a>
+            {% else %}
+              <span class="note-text">タグ未設定</span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state-panel" data-aos="zoom-in" data-aos-delay="20">
+      <h4 class="empty-state-title">マイリストはまだ空です</h4>
+      <p class="empty-state-description">作品詳細ページの「マイリストに追加」ボタンから、気になる作品を保存できます。</p>
+      <div class="empty-state-actions">
+        <a href="{{ url_for('index', category=current_category, filter_applied=1) }}" class="btn btn-minimal-solid">作品を探しにいく</a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

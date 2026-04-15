@@ -1,0 +1,763 @@
+{% extends "base.html" %}
+
+{% block title %}トップ | ニッチタグ作品DB{% endblock %}
+
+{% block content %}
+<section class="hero-area" data-aos="fade-up">
+  <p class="hero-kicker">Discover Niche Stories</p>
+  <h2 class="hero-title">作品名から探して、刺さるタグを見つける</h2>
+  <p class="hero-subtitle">アニメとドラマを切り替えながら、作品詳細ページでタグをすぐ追加できます。</p>
+
+  <form method="get" action="{{ url_for('search_works_by_title') }}" class="hero-search-form" role="search">
+    <input type="hidden" name="category" value="{{ current_category }}">
+    <input
+      id="heroSearchInput"
+      class="hero-search-input"
+      type="text"
+      name="q"
+      value="{{ request.args.get('q', '') }}"
+      placeholder="作品名を入力（部分一致）"
+      autocomplete="off"
+    >
+    <button type="submit" class="hero-search-button">検索</button>
+  </form>
+</section>
+
+<section class="category-switch mb-4" data-aos="fade-up" data-aos-delay="20">
+  {% for option in category_options %}
+    <a
+      class="category-pill{% if current_category == option.value %} is-active{% endif %}"
+      href="{{ url_for('index', category=option.value, filter_applied=1) }}"
+    >
+      {{ option.label }}
+    </a>
+  {% endfor %}
+</section>
+
+<section id="create-work" class="card-surface mb-4" data-aos="fade-up" data-aos-delay="40">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">新しい作品を登録</h3>
+    <p class="section-caption">作品名とタグを投稿して、みんなの検索体験を充実させましょう。</p>
+  </div>
+
+  {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('create_work') }}" class="row g-3 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="col-12 col-lg-4">
+        <label for="title" class="form-label">作品名</label>
+        <input id="title" name="title" type="text" class="form-control" placeholder="例: 〇〇物語" required>
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <label for="tags" class="form-label">タグ（任意）</label>
+        <input
+          id="tags"
+          name="tags"
+          type="text"
+          class="form-control"
+          placeholder="例: すれ違い, 幼なじみ再会"
+          autocomplete="off"
+          list="tagSuggestList"
+          data-tag-suggest="true"
+          data-multi-tag="true"
+        >
+      </div>
+
+      <div class="col-12">
+        <label for="synopsis" class="form-label">あらすじ（任意）</label>
+        <textarea
+          id="synopsis"
+          name="synopsis"
+          class="form-control"
+          rows="3"
+          placeholder="作品の概要や見どころを簡単に記載できます。"
+        ></textarea>
+      </div>
+
+      <div class="col-12 col-lg-2">
+        <label for="singleCategory" class="form-label">カテゴリ</label>
+        <select id="singleCategory" name="category" class="form-select">
+          {% for option in category_options %}
+            <option value="{{ option.value }}"{% if option.value == current_category %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-lg-2 d-grid">
+        <button type="submit" class="btn btn-minimal-solid">登録する</button>
+      </div>
+    </form>
+
+    <hr class="my-4">
+
+    <form method="post" action="{{ url_for('bulk_create_works') }}" class="row g-3 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="col-12 col-lg-8">
+        <label for="bulk_titles" class="form-label">作品名をまとめて登録（1行1作品）</label>
+        <textarea
+          id="bulk_titles"
+          name="bulk_titles"
+          class="form-control"
+          rows="5"
+          placeholder="作品A&#10;作品B&#10;作品C"
+        ></textarea>
+      </div>
+
+      <div class="col-12 col-lg-2">
+        <label for="bulkCategory" class="form-label">カテゴリ</label>
+        <select id="bulkCategory" name="category" class="form-select">
+          {% for option in category_options %}
+            <option value="{{ option.value }}"{% if option.value == current_category %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-lg-2 d-grid">
+        <button type="submit" class="btn btn-minimal">一括登録</button>
+      </div>
+    </form>
+  {% else %}
+    <p class="search-empty mb-0">
+      投稿機能はログイン後に利用できます。
+      <a href="{{ url_for('login', next=request.full_path) }}">ログインして参加する</a>
+    </p>
+  {% endif %}
+
+  <datalist id="tagSuggestList"></datalist>
+</section>
+
+<section class="card-surface mb-4" data-aos="fade-up" data-aos-delay="60">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">タグで絞り込み</h3>
+    <p class="section-caption">複数選択するとAND条件で絞り込みます。</p>
+  </div>
+
+  <form id="tagFilterForm" method="get" action="{{ url_for('index') }}">
+    <input type="hidden" name="category" value="{{ current_category }}">
+    <input type="hidden" name="filter_applied" value="1">
+    <div id="selectedTagInputs"></div>
+
+    {% if tag_catalog %}
+      <div class="tag-toggle-grid mb-4">
+        {% for item in tag_catalog %}
+          {% set tid = item.tag.id %}
+          <button
+            type="button"
+            class="tag-toggle-badge{% if tid in selected_tag_ids %} is-selected{% endif %}"
+            data-tag-id="{{ tid }}"
+            data-tag-name="{{ item.tag.name }}"
+            aria-pressed="{% if tid in selected_tag_ids %}true{% else %}false{% endif %}"
+          >
+            <span>{{ item.tag.name }}</span>
+            <span class="count">{{ item.work_count }}</span>
+          </button>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <p id="selectedTagSummary" class="section-caption mb-0"></p>
+
+        <div class="inline-actions">
+          <label class="auto-apply-toggle" for="autoApplyFilter">
+            <input id="autoApplyFilter" type="checkbox" class="form-check-input m-0">
+            <span>自動反映</span>
+          </label>
+          <button id="applyTagFilterButton" type="submit" class="btn btn-minimal">この条件で検索</button>
+          <a href="{{ url_for('clear_active_filters', category=current_category) }}" class="btn btn-minimal-soft">条件をクリア</a>
+        </div>
+      </div>
+    {% else %}
+      <p class="search-empty mb-0">このカテゴリにタグ付き作品はまだありません。</p>
+    {% endif %}
+  </form>
+</section>
+
+{% if and_results is not none %}
+  <section class="card-surface mb-4" data-aos="fade-up" data-aos-delay="80">
+    <div class="search-result-head mb-3">
+      <h3 class="section-title">{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}の検索結果</h3>
+      <p class="section-caption">{{ and_results_pagination.total if and_results_pagination else and_results|length }}件</p>
+    </div>
+
+    {% if selected_tags %}
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        {% for selected_tag in selected_tags %}
+          <a class="tag-chip" href="{{ url_for('tag_works', tag_id=selected_tag.id, category=current_category) }}">{{ selected_tag.name }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if and_results %}
+      <div class="work-grid">
+        {% for work in and_results %}
+          <article class="work-card">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <p class="work-category">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+                <h4 class="work-title">{{ work.title }}</h4>
+                <p class="work-meta">選択タグをすべて満たす作品</p>
+                {% if work.synopsis %}
+                  <p class="work-summary mb-0 mt-2">{{ work.synopsis[:140] }}{% if work.synopsis|length > 140 %}…{% endif %}</p>
+                {% endif %}
+              </div>
+              <div class="inline-actions">
+                <a class="btn btn-sm btn-minimal" href="{{ url_for('work_detail', work_id=work.id) }}">詳細</a>
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                  <form method="post" action="{{ url_for('delete_work', work_id=work.id, category=current_category) }}" onsubmit="return confirm('この作品を削除しますか？');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-minimal-danger">削除</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="work-tag-row" data-work-tags="{{ work.id }}">
+              {% for tag in work.tags %}
+                <a class="tag-chip small" data-tag-id="{{ tag.id }}" href="{{ url_for('tag_works', tag_id=tag.id, category=current_category) }}">{{ tag.name }}</a>
+              {% else %}
+                <span class="note-text">タグ未設定</span>
+              {% endfor %}
+            </div>
+
+            {% if current_user.is_authenticated %}
+              <form class="inline-tag-form mt-3" data-work-id="{{ work.id }}">
+                <input
+                  type="text"
+                  name="tags"
+                  class="inline-tag-input"
+                  placeholder="＋タグ追加（Enterで反映）"
+                  autocomplete="off"
+                  list="tagSuggestList"
+                  data-tag-suggest="true"
+                  data-multi-tag="true"
+                >
+                <p class="inline-tag-feedback" aria-live="polite"></p>
+              </form>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+
+      {% if and_results_pagination and and_results_pagination.pages > 1 %}
+        <nav class="pagination-wrap mt-4" aria-label="AND検索結果のページ送り">
+          <ul class="pagination pagination-minimal mb-0">
+            <li class="page-item{% if not and_results_pagination.has_prev %} disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('index', page=and_results_pagination.prev_num, category=current_category, filter_applied=1, tag_ids=selected_tag_ids) if and_results_pagination.has_prev else '#' }}">前へ</a>
+            </li>
+
+            {% for page_num in and_results_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+              {% if page_num %}
+                <li class="page-item{% if page_num == and_results_pagination.page %} active{% endif %}">
+                  <a class="page-link" href="{{ url_for('index', page=page_num, category=current_category, filter_applied=1, tag_ids=selected_tag_ids) }}">{{ page_num }}</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link is-ellipsis">…</span></li>
+              {% endif %}
+            {% endfor %}
+
+            <li class="page-item{% if not and_results_pagination.has_next %} disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('index', page=and_results_pagination.next_num, category=current_category, filter_applied=1, tag_ids=selected_tag_ids) if and_results_pagination.has_next else '#' }}">次へ</a>
+            </li>
+          </ul>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="empty-state-panel" data-aos="zoom-in" data-aos-delay="30">
+        <h4 class="empty-state-title">一致する{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}作品がまだありません</h4>
+        <p class="empty-state-description">
+          選択中のタグ条件に一致する作品が見つかりませんでした。あなたの投稿が、次に探す人の手がかりになります。
+        </p>
+        <div class="empty-state-actions">
+          <a href="{{ url_for('index', category=current_category, filter_applied=1) }}#create-work" class="btn btn-minimal-solid">＋新しい作品を登録</a>
+        </div>
+      </div>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if and_results is none %}
+  <section class="card-surface mb-4" data-aos="fade-up" data-aos-delay="100">
+    <div class="search-result-head mb-3">
+      <h3 class="section-title">{{ current_category == 'anime' and 'アニメ作品一覧' or 'ドラマ作品一覧' }}</h3>
+      <p class="section-caption">全{{ works_pagination.total if works_pagination else recent_works|length }}件</p>
+    </div>
+
+    {% if recent_works %}
+      <div class="work-grid">
+        {% for work in recent_works %}
+          <article class="work-card">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <p class="work-category">{{ work.category == 'anime' and 'アニメ' or 'ドラマ' }}</p>
+                <h4 class="work-title">{{ work.title }}</h4>
+                <p class="work-meta">登録ID: {{ work.id }}</p>
+                {% if work.synopsis %}
+                  <p class="work-summary mb-0 mt-2">{{ work.synopsis[:140] }}{% if work.synopsis|length > 140 %}…{% endif %}</p>
+                {% endif %}
+              </div>
+
+              <div class="inline-actions">
+                <a href="{{ url_for('work_detail', work_id=work.id) }}" class="btn btn-sm btn-minimal">詳細</a>
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                  <form method="post" action="{{ url_for('delete_work', work_id=work.id, category=current_category) }}" onsubmit="return confirm('この作品を削除しますか？');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-minimal-danger">削除</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="work-tag-row" data-work-tags="{{ work.id }}">
+              {% for tag in work.tags %}
+                <a class="tag-chip small" data-tag-id="{{ tag.id }}" href="{{ url_for('tag_works', tag_id=tag.id, category=current_category) }}">{{ tag.name }}</a>
+              {% else %}
+                <span class="note-text">タグ未設定</span>
+              {% endfor %}
+            </div>
+
+            {% if current_user.is_authenticated %}
+              <form class="inline-tag-form mt-3" data-work-id="{{ work.id }}">
+                <input
+                  type="text"
+                  name="tags"
+                  class="inline-tag-input"
+                  placeholder="＋タグ追加（Enterで反映）"
+                  autocomplete="off"
+                  list="tagSuggestList"
+                  data-tag-suggest="true"
+                  data-multi-tag="true"
+                >
+                <p class="inline-tag-feedback" aria-live="polite"></p>
+              </form>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+
+      {% if works_pagination and works_pagination.pages > 1 %}
+        <nav class="pagination-wrap mt-4" aria-label="作品一覧のページ送り">
+          <ul class="pagination pagination-minimal mb-0">
+            <li class="page-item{% if not works_pagination.has_prev %} disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('index', page=works_pagination.prev_num, category=current_category) if works_pagination.has_prev else '#' }}">前へ</a>
+            </li>
+
+            {% for page_num in works_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+              {% if page_num %}
+                <li class="page-item{% if page_num == works_pagination.page %} active{% endif %}">
+                  <a class="page-link" href="{{ url_for('index', page=page_num, category=current_category) }}">{{ page_num }}</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link is-ellipsis">…</span></li>
+              {% endif %}
+            {% endfor %}
+
+            <li class="page-item{% if not works_pagination.has_next %} disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('index', page=works_pagination.next_num, category=current_category) if works_pagination.has_next else '#' }}">次へ</a>
+            </li>
+          </ul>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="empty-state-panel" data-aos="zoom-in" data-aos-delay="30">
+        <h4 class="empty-state-title">まだ{{ current_category == 'anime' and 'アニメ' or 'ドラマ' }}の登録がありません</h4>
+        <p class="empty-state-description">
+          あなたが最初の作品を登録しませんか？ 作品名だけでも大丈夫です。あとからタグを追加できます。
+        </p>
+        <div class="empty-state-actions">
+          <a href="{{ url_for('index', category=current_category, filter_applied=1) }}#create-work" class="btn btn-minimal-solid">＋新しい作品を登録</a>
+        </div>
+      </div>
+    {% endif %}
+  </section>
+{% endif %}
+
+<section class="card-surface" data-aos="fade-up" data-aos-delay="120">
+  <div class="search-result-head mb-3">
+    <h3 class="section-title">人気のニッチタグ</h3>
+    <p class="section-caption">気になるタグから作品一覧へジャンプできます。</p>
+  </div>
+
+  {% if popular_tags %}
+    <div class="popular-tags-row">
+      {% for item in popular_tags %}
+        <a class="popular-tag-badge" href="{{ url_for('tag_works', tag_id=item.tag.id, category=current_category) }}">
+          <span class="name">{{ item.tag.name }}</span>
+          <span class="count">{{ item.work_count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="search-empty mb-0">このカテゴリにはまだ人気タグの集計対象がありません。</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const datalist = document.getElementById("tagSuggestList");
+    const inputs = Array.from(document.querySelectorAll('[data-tag-suggest="true"]'));
+    if (!datalist || inputs.length === 0) {
+      return;
+    }
+
+    const currentCategory = "{{ current_category }}";
+    let debounceTimer = null;
+    let activeController = null;
+
+    function clearSuggestions() {
+      datalist.innerHTML = "";
+    }
+
+    function parseSuggestionQuery(input) {
+      const rawValue = (input.value || "").replace(/、/g, ",");
+      if (input.dataset.multiTag === "true") {
+        const parts = rawValue.split(",");
+        const prefix = parts
+          .slice(0, -1)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .join(", ");
+        input.dataset.tagPrefix = prefix;
+        return (parts[parts.length - 1] || "").trim();
+      }
+
+      input.dataset.tagPrefix = "";
+      return rawValue.trim();
+    }
+
+    function renderSuggestions(items) {
+      clearSuggestions();
+      const uniqueNames = Array.from(new Set(items.map((item) => item.name))).slice(0, 12);
+      uniqueNames.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        datalist.appendChild(option);
+      });
+    }
+
+    async function fetchSuggestions(keyword) {
+      if (!keyword) {
+        clearSuggestions();
+        return;
+      }
+
+      if (activeController) {
+        activeController.abort();
+      }
+      activeController = new AbortController();
+
+      const endpoint =
+        "/api/tags/suggest?q=" +
+        encodeURIComponent(keyword) +
+        "&category=" +
+        encodeURIComponent(currentCategory);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          credentials: "same-origin",
+          signal: activeController.signal
+        });
+
+        if (!response.ok) {
+          clearSuggestions();
+          return;
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        renderSuggestions(items);
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        clearSuggestions();
+      }
+    }
+
+    function maybeMergeSelectedTag(input) {
+      if (input.dataset.multiTag !== "true") {
+        return;
+      }
+
+      const prefix = (input.dataset.tagPrefix || "").trim();
+      const selected = (input.value || "").trim();
+      if (!prefix || !selected || selected.includes(",")) {
+        return;
+      }
+
+      input.value = prefix + ", " + selected;
+      input.dataset.tagPrefix = input.value;
+    }
+
+    inputs.forEach((input) => {
+      input.addEventListener("input", () => {
+        const keyword = parseSuggestionQuery(input);
+        if (debounceTimer) {
+          window.clearTimeout(debounceTimer);
+        }
+        debounceTimer = window.setTimeout(() => {
+          fetchSuggestions(keyword);
+        }, 140);
+      });
+
+      input.addEventListener("change", () => {
+        maybeMergeSelectedTag(input);
+      });
+
+      input.addEventListener("blur", () => {
+        window.setTimeout(clearSuggestions, 120);
+      });
+    });
+  })();
+
+  (function () {
+    const singleCategory = document.getElementById("singleCategory");
+    const bulkCategory = document.getElementById("bulkCategory");
+    if (!singleCategory && !bulkCategory) {
+      return;
+    }
+
+    const fallbackCategory = "{{ current_category }}";
+    const categoryTabs = Array.from(document.querySelectorAll(".category-switch .category-pill"));
+
+    function syncSelect(select, value) {
+      if (!select || !value) {
+        return;
+      }
+
+      const hasOption = Array.from(select.options).some((option) => option.value === value);
+      if (hasOption) {
+        select.value = value;
+      }
+    }
+
+    function syncAll(value) {
+      syncSelect(singleCategory, value);
+      syncSelect(bulkCategory, value);
+    }
+
+    function getCategoryFromHref(href) {
+      if (!href) {
+        return "";
+      }
+
+      try {
+        const target = new URL(href, window.location.origin);
+        return target.searchParams.get("category") || "";
+      } catch (error) {
+        return "";
+      }
+    }
+
+    function detectCurrentCategory() {
+      const urlCategory = new URLSearchParams(window.location.search).get("category");
+      if (urlCategory) {
+        return urlCategory;
+      }
+
+      const activeTab = categoryTabs.find((tab) => tab.classList.contains("is-active"));
+      const tabCategory = activeTab ? getCategoryFromHref(activeTab.getAttribute("href")) : "";
+      return tabCategory || fallbackCategory;
+    }
+
+    const initialCategory = detectCurrentCategory();
+    syncAll(initialCategory || fallbackCategory);
+
+    categoryTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const nextCategory = getCategoryFromHref(tab.getAttribute("href")) || fallbackCategory;
+        syncAll(nextCategory);
+      });
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("tagFilterForm");
+    if (!form) {
+      return;
+    }
+
+    const badges = Array.from(document.querySelectorAll(".tag-toggle-badge"));
+    const hiddenInputsBox = document.getElementById("selectedTagInputs");
+    const summary = document.getElementById("selectedTagSummary");
+    const autoApply = document.getElementById("autoApplyFilter");
+
+    function getSelectedBadges() {
+      return badges.filter((badge) => badge.classList.contains("is-selected"));
+    }
+
+    function setBadgeSelected(badge, selected) {
+      badge.classList.toggle("is-selected", selected);
+      badge.setAttribute("aria-pressed", String(selected));
+    }
+
+    function syncHiddenInputs() {
+      if (!hiddenInputsBox) {
+        return;
+      }
+
+      hiddenInputsBox.innerHTML = "";
+      getSelectedBadges().forEach((badge) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "tag_ids";
+        input.value = badge.dataset.tagId || "";
+        hiddenInputsBox.appendChild(input);
+      });
+    }
+
+    function syncSummary() {
+      if (!summary) {
+        return;
+      }
+
+      const selectedNames = getSelectedBadges().map((badge) => badge.dataset.tagName || "");
+      if (selectedNames.length === 0) {
+        summary.textContent = "タグを選択するとAND検索できます。";
+        return;
+      }
+
+      summary.textContent = "選択中: " + selectedNames.join(" / ");
+    }
+
+    function maybeAutoApply() {
+      if (autoApply && autoApply.checked) {
+        form.requestSubmit();
+      }
+    }
+
+    badges.forEach((badge) => {
+      badge.addEventListener("click", () => {
+        const selected = !badge.classList.contains("is-selected");
+        setBadgeSelected(badge, selected);
+        syncHiddenInputs();
+        syncSummary();
+        maybeAutoApply();
+      });
+    });
+
+    syncHiddenInputs();
+    syncSummary();
+  })();
+
+  (function () {
+    const inlineForms = Array.from(document.querySelectorAll(".inline-tag-form"));
+    if (inlineForms.length === 0) {
+      return;
+    }
+
+    const loginUrl = "{{ url_for('login') }}";
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+    const currentCategory = "{{ current_category }}";
+
+    function setFeedback(feedbackNode, message, isError) {
+      if (!feedbackNode) {
+        return;
+      }
+
+      feedbackNode.textContent = message || "";
+      feedbackNode.classList.toggle("is-error", Boolean(isError));
+      feedbackNode.classList.toggle("is-success", !isError && Boolean(message));
+    }
+
+    function appendTagToCard(workId, tag) {
+      const row = document.querySelector('.work-tag-row[data-work-tags="' + workId + '"]');
+      if (!row) {
+        return;
+      }
+
+      const existing = row.querySelector('[data-tag-id="' + tag.id + '"]');
+      if (existing) {
+        return;
+      }
+
+      const emptyNote = row.querySelector(".note-text");
+      if (emptyNote) {
+        emptyNote.remove();
+      }
+
+      const tagLink = document.createElement("a");
+      tagLink.className = "tag-chip small tag-chip-inline tag-chip-enter";
+      tagLink.href = "/tag/" + String(tag.id) + "?category=" + encodeURIComponent(currentCategory);
+      tagLink.dataset.tagId = String(tag.id);
+      tagLink.textContent = tag.name;
+      row.appendChild(tagLink);
+
+      requestAnimationFrame(() => {
+        tagLink.classList.add("is-visible");
+      });
+    }
+
+    async function submitInlineTag(form) {
+      const workId = form.dataset.workId || "";
+      const input = form.querySelector('input[name="tags"]');
+      const feedback = form.querySelector(".inline-tag-feedback");
+      if (!workId || !input) {
+        return;
+      }
+
+      const rawTags = input.value.trim();
+      if (!rawTags) {
+        setFeedback(feedback, "タグ名を入力してください。", true);
+        return;
+      }
+
+      form.classList.add("is-loading");
+      input.disabled = true;
+      setFeedback(feedback, "追加中...", false);
+
+      try {
+        const response = await fetch("/api/work/" + workId + "/add_tags", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ tags: rawTags })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          // 未ログイン時は、現在ページへ戻れるnext付きでログイン画面へ移動する。
+          const nextPath = window.location.pathname + window.location.search;
+          window.location.href = loginUrl + "?next=" + encodeURIComponent(nextPath);
+          return;
+        }
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "タグ追加に失敗しました。");
+        }
+
+        if (Array.isArray(payload.added_tags)) {
+          payload.added_tags.forEach((tag) => {
+            appendTagToCard(workId, tag);
+          });
+        }
+
+        input.value = "";
+        setFeedback(feedback, payload.message || "タグを追加しました。", false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "タグ追加に失敗しました。";
+        setFeedback(feedback, message, true);
+      } finally {
+        form.classList.remove("is-loading");
+        input.disabled = false;
+        input.focus();
+      }
+    }
+
+    inlineForms.forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitInlineTag(form);
+      });
+    });
+  })();
+</script>
+{% endblock %}
