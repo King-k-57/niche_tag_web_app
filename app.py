@@ -240,7 +240,7 @@ def create_app() -> Flask:
     instance_dir = os.path.join(base_dir, "instance")
     os.makedirs(instance_dir, exist_ok=True)
 
-    app.config["SECRET_KEY"] = "dev-secret-key"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
 
     # 本番ではDATABASE_URL(PostgreSQL)を優先し、未設定時のみローカルSQLiteを使う。
     database_url = os.getenv("DATABASE_URL", "").strip()
