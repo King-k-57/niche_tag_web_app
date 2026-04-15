@@ -39,7 +39,7 @@ def upgrade():
             sa.Column('id', sa.Integer(), nullable=False),
             sa.Column('username', sa.String(length=80), nullable=False),
             sa.Column('password_hash', sa.String(length=255), nullable=False),
-            sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
             sa.PrimaryKeyConstraint('id'),
             sa.UniqueConstraint('username'),
