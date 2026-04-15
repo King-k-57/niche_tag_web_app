@@ -23,6 +23,9 @@ def _has_table(table_name: str) -> bool:
 
 
 def _has_column(table_name: str, column_name: str) -> bool:
+    if not _has_table(table_name):
+        return False
+
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     columns = [col['name'] for col in inspector.get_columns(table_name)]
@@ -30,6 +33,18 @@ def _has_column(table_name: str, column_name: str) -> bool:
 
 
 def upgrade():
+    if not _has_table('users'):
+        op.create_table(
+            'users',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('username', sa.String(length=80), nullable=False),
+            sa.Column('password_hash', sa.String(length=255), nullable=False),
+            sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('username'),
+        )
+
     if not _has_table('bookmarks'):
         op.create_table(
             'bookmarks',
@@ -63,3 +78,6 @@ def downgrade():
 
     if _has_table('bookmarks'):
         op.drop_table('bookmarks')
+
+    # usersテーブルは既存環境で既に運用されている可能性があるため、
+    # downgradeでは安全のため削除しない。
